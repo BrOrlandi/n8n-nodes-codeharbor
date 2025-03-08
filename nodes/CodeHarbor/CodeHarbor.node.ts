@@ -100,55 +100,64 @@ export class CodeHarbor implements INodeType {
 				description: "JavaScript code to execute. Must export a function that takes a single item and returns processed data. You can use console.log for debugging.",
 				required: true,
 			},
+			// Advanced Options Section
 			{
-				displayName: "Input Items",
-				name: "items",
-				type: "json",
-				displayOptions: {
-					show: {
-						mode: [
-							"runOnceForEachItem",
-						]
-					}
-				},
-				default: "={{ $json }}",
-				description: "The input data to pass to the JavaScript function for each item",
-			},
-			{
-				displayName: "Cache Key",
-				name: "cacheKey",
-				type: "string",
-				default: "={{ $workflow.id }}",
-				description: "Unique identifier for caching dependencies",
-				required: true,
-			},
-			{
-				displayName: "Timeout",
-				name: "timeout",
-				type: "number",
-				default: 60000,
-				description: "Maximum execution time in milliseconds",
-			},
-			{
-				displayName: "Force Update Dependencies",
-				name: "forceUpdate",
-				type: "boolean",
-				default: false,
-				description: "Whether to force fresh installation of dependencies",
-			},
-			{
-				displayName: "Debug Mode",
-				name: "debug",
-				type: "boolean",
-				default: false,
-				description: "Whether to return detailed debug information about the execution",
-			},
-			{
-				displayName: "Capture Console Logs",
-				name: "captureLogs",
-				type: "boolean",
-				default: false,
-				description: "Whether to include console logs in the output data",
+				displayName: 'Advanced Options',
+				name: 'advancedOptions',
+				type: 'collection',
+				default: {},
+				placeholder: 'Add Option',
+				options: [
+					{
+						displayName: "Cache Key",
+						name: "cacheKey",
+						type: "string",
+						default: "={{ $workflow.id }}",
+						description: "Unique identifier for caching dependencies",
+					},
+					{
+						displayName: "Capture Console Logs",
+						name: "captureLogs",
+						type: "boolean",
+						default: false,
+						description: "Whether to include console logs in the output data",
+					},
+					{
+						displayName: "Debug Mode",
+						name: "debug",
+						type: "boolean",
+						default: false,
+						description: "Whether to return detailed debug information about the execution",
+					},
+					{
+						displayName: "Force Update Dependencies",
+						name: "forceUpdate",
+						type: "boolean",
+						default: false,
+						description: "Whether to force fresh installation of dependencies",
+					},
+					{
+						displayName: "Input Items",
+						name: "items",
+						type: "json",
+						displayOptions: {
+							show: {
+								"/mode": [
+									"runOnceForEachItem",
+								]
+							}
+						},
+						default: "={{ $json }}",
+						description: "The input data to pass to the JavaScript function for each item",
+					},
+					{
+						displayName: "Timeout",
+						name: "timeout",
+						type: "number",
+						default: 60000,
+						description: "Maximum execution time in milliseconds",
+					},
+				],
 			},
 		],
 	};
@@ -164,11 +173,18 @@ export class CodeHarbor implements INodeType {
 			try {
 				const code = this.getNodeParameter('code', 0) as string;
 				const inputItems = items.map(item => item.json);
-				const cacheKey = this.getNodeParameter('cacheKey', 0) as string;
-				const timeout = this.getNodeParameter('timeout', 0) as number;
-				const forceUpdate = this.getNodeParameter('forceUpdate', 0) as boolean;
-				const debug = this.getNodeParameter('debug', 0) as boolean;
-				const captureLogs = this.getNodeParameter('captureLogs', 0) as boolean;
+				const advancedOptions = this.getNodeParameter('advancedOptions', 0) as {
+					cacheKey?: string;
+					timeout?: number;
+					forceUpdate?: boolean;
+					debug?: boolean;
+					captureLogs?: boolean;
+				};
+				const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
+				const timeout = advancedOptions.timeout || 60000;
+				const forceUpdate = advancedOptions.forceUpdate || false;
+				const debug = advancedOptions.debug || false;
+				const captureLogs = advancedOptions.captureLogs || false;
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -255,12 +271,20 @@ export class CodeHarbor implements INodeType {
 			for (let i = 0; i < items.length; i++) {
 				try {
 					const code = this.getNodeParameter('code', i) as string;
-					const inputItem = this.getNodeParameter('items', i);
-					const cacheKey = this.getNodeParameter('cacheKey', i) as string;
-					const timeout = this.getNodeParameter('timeout', i) as number;
-					const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
-					const debug = this.getNodeParameter('debug', i) as boolean;
-					const captureLogs = this.getNodeParameter('captureLogs', i) as boolean;
+					const advancedOptions = this.getNodeParameter('advancedOptions', i) as {
+						items?: any;
+						cacheKey?: string;
+						timeout?: number;
+						forceUpdate?: boolean;
+						debug?: boolean;
+						captureLogs?: boolean;
+					};
+					const inputItem = advancedOptions.items || items[i].json;
+					const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
+					const timeout = advancedOptions.timeout || 60000;
+					const forceUpdate = advancedOptions.forceUpdate || false;
+					const debug = advancedOptions.debug || false;
+					const captureLogs = advancedOptions.captureLogs || false;
 
 					// Make API request to CodeHarbor service
 					const response = await this.helpers.httpRequest({
