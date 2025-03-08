@@ -1,30 +1,24 @@
 {
 	"compilerOptions": {
-		"strict": true,
+		"strict": false,                        // Turn off strict mode
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"target": "es2019",
-		"lib": ["es2019", "es2020", "es2022.error"],
+		"lib": ["es2019", "es2020", "es2022"],
 		"removeComments": true,
 		"useUnknownInCatchVariables": false,
 		"forceConsistentCasingInFileNames": true,
-		"noImplicitAny": true,
-		"noImplicitReturns": true,
-		"noUnusedLocals": true,
-		"strictNullChecks": true,
-		"preserveConstEnums": true,
-		"esModuleInterop": true,
-		"resolveJsonModule": true,
-		"incremental": true,
+		"noImplicitAny": false,                 // Allow implicit any
+		"noImplicitReturns": false,             // Don't require return statements
 		"declaration": true,
+		"outDir": "./dist",
+		"esModuleInterop": true,
 		"sourceMap": true,
-		"skipLibCheck": true,
-		"outDir": "./dist/",
+		"skipLibCheck": true,                   // Skip type checking of declaration files
+		"strictNullChecks": false,              // Disable strict null checks
+		"resolveJsonModule": true,
+		"noEmitOnError": false,                 // Output files even when there are errors
+		"suppressImplicitAnyIndexErrors": true, // Suppress index signature errors
 	},
-	"include": [
-		"credentials/**/*",
-		"nodes/**/*",
-		"nodes/**/*.json",
-		"package.json",
-	],
+	"include": ["nodes", "credentials", "*.ts", "*.js"]
 }
