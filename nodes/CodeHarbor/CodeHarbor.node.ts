@@ -13,12 +13,11 @@ export class CodeHarbor implements INodeType {
 		icon: "file:icon.svg",
 		group: ["transform"],
 		version: 1,
-		subtitle: '={{ $parameter["operation"] + ": " + $parameter["resource"] }}',
+		subtitle: 'Execute JavaScript code',
 		description: "Execute JavaScript code with dependencies in a Docker container environment",
 		defaults: {
 			name: "CodeHarbor",
 		},
-			// Fix type errors by simplifying to use n8n standard notation
 		// eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
 		inputs: [{
 			type: NodeConnectionType.Main,
@@ -31,7 +30,7 @@ export class CodeHarbor implements INodeType {
 		}],
 		credentials: [
 			{
-				name: 'codeHarborServerApi', // Make sure this is lowercase to match the credential name property
+				name: 'codeHarborServerApi',
 				required: true,
 			},
 		],
@@ -40,83 +39,9 @@ export class CodeHarbor implements INodeType {
 				Accept: "application/json",
 				'Content-Type': 'application/json',
 			},
-			baseURL: "https://codeharbor.brorlandi.xyz",
+			baseURL: "={{ $credentials.url }}",
 		},
 		properties: [
-			{
-				displayName: "Resource",
-				name: "resource",
-				type: "options",
-				noDataExpression: true,
-				options: [
-					{
-						name: "Project",
-						value: "project",
-						},
-					{
-						name: "Code",
-						value: "code",
-					},
-				],
-				default: "code",
-			},
-			{
-				displayName: "Operation",
-				name: "operation",
-				type: "options",
-				noDataExpression: true,
-				displayOptions: {
-					show: {
-						resource: [
-							"project",
-						],
-					},
-				},
-				options: [
-					{
-						name: "Create",
-						value: "create",
-						action: 'Create a project',
-					},
-					{
-						name: "Delete",
-						value: "delete",
-						action: 'Delete a project',
-					},
-					{
-						name: "Get",
-						value: "get",
-						action: 'Get a project',
-					},
-					{
-						name: "Update",
-						value: "update",
-						action: 'Update a project',
-					},
-				],
-				default: "get",
-			},
-			{
-				displayName: "Operation",
-				name: "operation",
-				type: "options",
-				noDataExpression: true,
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-					},
-				},
-				options: [
-					{
-						name: "Execute",
-						value: "execute",
-						action: 'Execute a code',
-					},
-				],
-				default: "execute",
-			},
 			// Code execution properties
 			{
 				displayName: "Code",
@@ -126,34 +51,14 @@ export class CodeHarbor implements INodeType {
 					editor: "jsEditor",
 					editorLanguage: "javascript",
 				},
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
-				default: "module.exports = function(items) {\n  // Your code here\n  // Example: Transform input items\n  return items.map(item => {\n    // Process each item\n    return item;\n  });\n}",
-				description: "JavaScript code to execute. Must export a function that takes input items and returns processed data.",
+				default: "module.exports = function(items) {\n  // Your code here\n  // Example: Transform input items\n  console.log('Processing items:', items.length);\n\n  return items.map(item => {\n    // Process each item\n    console.log('Processing item:', item);\n    return item;\n  });\n}",
+				description: "JavaScript code to execute. Must export a function that takes input items and returns processed data. You can use console.log for debugging.",
 				required: true,
 			},
 			{
 				displayName: "Input Items",
 				name: "items",
 				type: "json",
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
 				default: "={{ $json }}",
 				description: "The input data to pass to the JavaScript function",
 			},
@@ -161,16 +66,6 @@ export class CodeHarbor implements INodeType {
 				displayName: "Cache Key",
 				name: "cacheKey",
 				type: "string",
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
 				default: "={{ $workflow.id }}-{{ $node.id }}",
 				description: "Unique identifier for caching dependencies",
 				required: true,
@@ -179,16 +74,6 @@ export class CodeHarbor implements INodeType {
 				displayName: "Timeout",
 				name: "timeout",
 				type: "number",
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
 				default: 60000,
 				description: "Maximum execution time in milliseconds",
 			},
@@ -196,16 +81,6 @@ export class CodeHarbor implements INodeType {
 				displayName: "Force Update Dependencies",
 				name: "forceUpdate",
 				type: "boolean",
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
 				default: false,
 				description: "Whether to force fresh installation of dependencies",
 			},
@@ -213,25 +88,121 @@ export class CodeHarbor implements INodeType {
 				displayName: "Debug Mode",
 				name: "debug",
 				type: "boolean",
-				displayOptions: {
-					show: {
-						resource: [
-							"code",
-						],
-						operation: [
-							"execute",
-						],
-					},
-				},
 				default: false,
 				description: "Whether to return detailed debug information about the execution",
+				},
+			{
+				displayName: "Capture Console Output",
+				name: "captureConsole",
+				type: "boolean",
+				default: true,
+				description: "Whether to capture console.log output from the executed code",
 			},
 		],
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		// Implementation will be added in future updates
 		const items = this.getInputData();
-		return [items]; // Return input items unchanged for now
+		const returnData: INodeExecutionData[] = [];
+		const credentials = await this.getCredentials('codeHarborServerApi');
+
+		this.logger.info('credentials');
+		this.logger.info(JSON.stringify(credentials));
+
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const code = this.getNodeParameter('code', i) as string;
+				const inputItems = this.getNodeParameter('items', i);
+				const cacheKey = this.getNodeParameter('cacheKey', i) as string;
+				const timeout = this.getNodeParameter('timeout', i) as number;
+				const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
+				const debug = this.getNodeParameter('debug', i) as boolean;
+				const captureConsole = this.getNodeParameter('captureConsole', i) as boolean;
+
+				// Make API request to CodeHarbor service
+				const response = await this.helpers.httpRequest({
+					method: 'POST',
+					url: credentials.url + '/execute',
+					headers: {
+						'Authorization': `Bearer ${credentials.apiKey}`,
+					},
+					body: {
+						code,
+						items: inputItems,
+						cacheKey,
+						options: {
+							timeout,
+							forceUpdate,
+							debug,
+							captureConsole,
+						},
+					},
+				});
+
+				// Process the response
+				if (response.success) {
+					if (Array.isArray(response.data)) {
+						// Handle array of results - wrap each item in a result property
+						response.data.forEach(item => {
+							const outputJson: Record<string, any> = {
+								result: item
+							};
+
+							// Add console logs if available
+							if (captureConsole && response.consoleOutput) {
+								outputJson._consoleOutput = response.consoleOutput;
+							}
+
+							// Add debug info if requested
+							if (debug && response.debug) {
+								outputJson._debug = response.debug;
+							}
+
+							returnData.push({
+								json: outputJson,
+								pairedItem: { item: i }
+							});
+						});
+					} else {
+						// Handle single result - wrap in a result property
+						const outputJson: Record<string, any> = {
+							result: response.data
+						};
+
+						// Add debug info if requested
+						if (debug && response.debug) {
+							outputJson._debug = response.debug;
+						}
+
+						// Add console logs if available
+						if (captureConsole && response.consoleOutput) {
+							outputJson._consoleOutput = response.consoleOutput;
+						}
+
+						returnData.push({
+							json: outputJson,
+							pairedItem: { item: i }
+						});
+					}
+				} else {
+					// Handle error response
+					throw new Error(response.error || 'Unknown error occurred');
+				}
+			} catch (error) {
+				if (this.continueOnFail()) {
+					returnData.push({
+						json: {
+							error: error.message,
+						},
+						pairedItem: { item: i },
+					});
+				} else {
+					throw error;
+				}
+			}
+		}
+
+		return [returnData];
 	}
 }
