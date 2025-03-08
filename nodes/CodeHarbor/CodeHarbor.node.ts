@@ -42,6 +42,24 @@ export class CodeHarbor implements INodeType {
 			baseURL: "={{ $credentials.url }}",
 		},
 		properties: [
+				// Mode selection
+			{
+				displayName: 'Mode',
+				name: 'mode',
+				type: 'options',
+				options: [
+					{
+						name: 'Run Once for All Items',
+						value: 'runOnceForAllItems',
+					},
+					{
+						name: 'Run Once for Each Item',
+						value: 'runOnceForEachItem',
+					},
+				],
+				default: 'runOnceForAllItems',
+				description: 'Whether to run the code once for all items or once for each item',
+			},
 			// Code execution properties
 			{
 				displayName: "Code",
@@ -66,7 +84,7 @@ export class CodeHarbor implements INodeType {
 				displayName: "Cache Key",
 				name: "cacheKey",
 				type: "string",
-				default: "={{ $workflow.id }}-{{ $node.id }}",
+				default: "={{ $workflow.id }}",
 				description: "Unique identifier for caching dependencies",
 				required: true,
 			},
@@ -105,20 +123,21 @@ export class CodeHarbor implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 		const credentials = await this.getCredentials('codeHarborServerApi');
+		const mode = this.getNodeParameter('mode', 0) as string;
 
 		this.logger.info('credentials');
 		this.logger.info(JSON.stringify(credentials));
 
-
-		for (let i = 0; i < items.length; i++) {
+		if (mode === 'runOnceForAllItems') {
+			// Run code once for all items
 			try {
-				const code = this.getNodeParameter('code', i) as string;
-				const inputItems = this.getNodeParameter('items', i);
-				const cacheKey = this.getNodeParameter('cacheKey', i) as string;
-				const timeout = this.getNodeParameter('timeout', i) as number;
-				const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
-				const debug = this.getNodeParameter('debug', i) as boolean;
-				const captureConsole = this.getNodeParameter('captureConsole', i) as boolean;
+				const code = this.getNodeParameter('code', 0) as string;
+				const inputItems = items.map(item => item.json);
+				const cacheKey = this.getNodeParameter('cacheKey', 0) as string;
+				const timeout = this.getNodeParameter('timeout', 0) as number;
+				const forceUpdate = this.getNodeParameter('forceUpdate', 0) as boolean;
+				const debug = this.getNodeParameter('debug', 0) as boolean;
+				const captureConsole = this.getNodeParameter('captureConsole', 0) as boolean;
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -144,7 +163,7 @@ export class CodeHarbor implements INodeType {
 				if (response.success) {
 					if (Array.isArray(response.data)) {
 						// Handle array of results - wrap each item in a result property
-						response.data.forEach(item => {
+						response.data.forEach((item, index) => {
 							const outputJson: Record<string, any> = {
 								result: item
 							};
@@ -161,7 +180,7 @@ export class CodeHarbor implements INodeType {
 
 							returnData.push({
 								json: outputJson,
-								pairedItem: { item: i }
+								pairedItem: index < items.length ? { item: index } : undefined,
 							});
 						});
 					} else {
@@ -182,7 +201,7 @@ export class CodeHarbor implements INodeType {
 
 						returnData.push({
 							json: outputJson,
-							pairedItem: { item: i }
+							pairedItem: { item: 0 }
 						});
 					}
 				} else {
@@ -195,10 +214,104 @@ export class CodeHarbor implements INodeType {
 						json: {
 							error: error.message,
 						},
-						pairedItem: { item: i },
+						pairedItem: { item: 0 },
 					});
 				} else {
 					throw error;
+				}
+			}
+		} else {
+			// Run code once for each item
+			for (let i = 0; i < items.length; i++) {
+				try {
+					const code = this.getNodeParameter('code', i) as string;
+					const inputItems = this.getNodeParameter('items', i);
+					const cacheKey = this.getNodeParameter('cacheKey', i) as string;
+					const timeout = this.getNodeParameter('timeout', i) as number;
+					const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
+					const debug = this.getNodeParameter('debug', i) as boolean;
+					const captureConsole = this.getNodeParameter('captureConsole', i) as boolean;
+
+					// Make API request to CodeHarbor service
+					const response = await this.helpers.httpRequest({
+						method: 'POST',
+						url: credentials.url + '/execute',
+						headers: {
+							'Authorization': `Bearer ${credentials.apiKey}`,
+						},
+						body: {
+							code,
+							items: [inputItems], // Send only the current item
+							cacheKey,
+							options: {
+								timeout,
+								forceUpdate,
+								debug,
+								captureConsole,
+							},
+						},
+					});
+
+					// Process the response
+					if (response.success) {
+						if (Array.isArray(response.data)) {
+							// Handle array of results
+							response.data.forEach(item => {
+								const outputJson: Record<string, any> = {
+									result: item
+								};
+
+								// Add console logs if available
+								if (captureConsole && response.consoleOutput) {
+									outputJson._consoleOutput = response.consoleOutput;
+								}
+
+								// Add debug info if requested
+								if (debug && response.debug) {
+									outputJson._debug = response.debug;
+								}
+
+								returnData.push({
+									json: outputJson,
+									pairedItem: { item: i }
+								});
+							});
+						} else {
+							// Handle single result
+							const outputJson: Record<string, any> = {
+								result: response.data
+							};
+
+							// Add debug info if requested
+							if (debug && response.debug) {
+								outputJson._debug = response.debug;
+							}
+
+							// Add console logs if available
+							if (captureConsole && response.consoleOutput) {
+								outputJson._consoleOutput = response.consoleOutput;
+							}
+
+							returnData.push({
+								json: outputJson,
+								pairedItem: { item: i }
+							});
+						}
+					} else {
+						// Handle error response
+						throw new Error(response.error || 'Unknown error occurred');
+					}
+				} catch (error) {
+					if (this.continueOnFail()) {
+						returnData.push({
+							json: {
+								error: error.message,
+							},
+							pairedItem: { item: i },
+						});
+					} else {
+						throw error;
+					}
 				}
 			}
 		}
