@@ -143,13 +143,6 @@ export class CodeHarbor implements INodeType {
 				default: false,
 				description: "Whether to return detailed debug information about the execution",
 				},
-			{
-				displayName: "Capture Console Output",
-				name: "captureConsole",
-				type: "boolean",
-				default: true,
-				description: "Whether to capture console.log output from the executed code",
-			},
 		],
 	};
 
@@ -158,9 +151,6 @@ export class CodeHarbor implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 		const credentials = await this.getCredentials('codeHarborServerApi');
 		const mode = this.getNodeParameter('mode', 0) as string;
-
-		this.logger.info('credentials');
-		this.logger.info(JSON.stringify(credentials));
 
 		if (mode === 'runOnceForAllItems') {
 			// Run code once for all items
@@ -171,7 +161,6 @@ export class CodeHarbor implements INodeType {
 				const timeout = this.getNodeParameter('timeout', 0) as number;
 				const forceUpdate = this.getNodeParameter('forceUpdate', 0) as boolean;
 				const debug = this.getNodeParameter('debug', 0) as boolean;
-				const captureConsole = this.getNodeParameter('captureConsole', 0) as boolean;
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -188,7 +177,6 @@ export class CodeHarbor implements INodeType {
 							timeout,
 							forceUpdate,
 							debug,
-							captureConsole,
 						},
 					},
 				});
@@ -201,11 +189,6 @@ export class CodeHarbor implements INodeType {
 							const outputJson: Record<string, any> = {
 								result: item
 							};
-
-							// Add console logs if available
-							if (captureConsole && response.consoleOutput) {
-								outputJson._consoleOutput = response.consoleOutput;
-							}
 
 							// Add debug info if requested
 							if (debug && response.debug) {
@@ -226,11 +209,6 @@ export class CodeHarbor implements INodeType {
 						// Add debug info if requested
 						if (debug && response.debug) {
 							outputJson._debug = response.debug;
-						}
-
-						// Add console logs if available
-						if (captureConsole && response.consoleOutput) {
-							outputJson._consoleOutput = response.consoleOutput;
 						}
 
 						returnData.push({
@@ -264,7 +242,6 @@ export class CodeHarbor implements INodeType {
 					const timeout = this.getNodeParameter('timeout', i) as number;
 					const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
 					const debug = this.getNodeParameter('debug', i) as boolean;
-					const captureConsole = this.getNodeParameter('captureConsole', i) as boolean;
 
 					// Make API request to CodeHarbor service
 					const response = await this.helpers.httpRequest({
@@ -281,7 +258,6 @@ export class CodeHarbor implements INodeType {
 								timeout,
 								forceUpdate,
 								debug,
-								captureConsole,
 							},
 						},
 					});
@@ -294,11 +270,6 @@ export class CodeHarbor implements INodeType {
 								const outputJson: Record<string, any> = {
 									result: item
 								};
-
-								// Add console logs if available
-								if (captureConsole && response.consoleOutput) {
-									outputJson._consoleOutput = response.consoleOutput;
-								}
 
 								// Add debug info if requested
 								if (debug && response.debug) {
@@ -319,11 +290,6 @@ export class CodeHarbor implements INodeType {
 							// Add debug info if requested
 							if (debug && response.debug) {
 								outputJson._debug = response.debug;
-							}
-
-							// Add console logs if available
-							if (captureConsole && response.consoleOutput) {
-								outputJson._consoleOutput = response.consoleOutput;
 							}
 
 							returnData.push({
