@@ -21,12 +21,12 @@ export class CodeHarbor implements INodeType {
 		// eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
 		inputs: [{
 			type: NodeConnectionType.Main,
-			displayName: 'Input',
+			// displayName: 'Input',
 		}],
 		// eslint-disable-next-line n8n-nodes-base/node-class-description-outputs-wrong
 		outputs: [{
 			type: NodeConnectionType.Main,
-			displayName: 'Output',
+			// displayName: 'Output',
 		}],
 		credentials: [
 			{
@@ -76,7 +76,7 @@ export class CodeHarbor implements INodeType {
 						]
 					}
 				},
-				default: "// This function runs once and receives all items as an array\n// You can use external npm packages by requiring them\n// Example: const lodash = require('lodash');\n\nmodule.exports = function(items) {\n  console.log('Processing batch of', items.length, 'items');\n  \n  // Process all items in a single execution\n  const results = items.map(item => {\n    // Process each item\n    console.log('Processing:', item);\n    \n    // Return a new object with processed data\n    return {\n      ...item,\n    };\n  });\n  \n  return results;\n};",
+				default: "// This function runs once and receives all items as an array\n// You can use external npm packages by requiring them\n\nmodule.exports = function(items) {\n  console.log('Processing batch of', items.length, 'items');\n  \n  // Process all items in a single execution\n  const results = items.map(item => {\n    // Process each item\n    console.log('Processing:', item);\n    \n    // Return a new object with processed data\n    return {\n      ...item,\n    };\n  });\n  \n  return results;\n};",
 				description: "JavaScript code to execute. Must export a function that takes items array and returns processed data. You can use console.log for debugging.",
 				required: true,
 			},
@@ -96,7 +96,7 @@ export class CodeHarbor implements INodeType {
 						]
 					}
 				},
-				default: "// This function runs once for each item\n// You can use external npm packages by requiring them\n// Example: const lodash = require('lodash');\n\nmodule.exports = function(item) {\n  console.log('Processing item:', item);\n  \n  // Process the single item\n  const result = {\n    ...item,\n};\n  \n  return result;\n};",
+				default: "// This function runs once for each item\n// You can use external npm packages by requiring them\n\nmodule.exports = function(item) {\n  console.log('Processing item:', item);\n  \n  // Process the single item\n  const result = {\n    ...item,\n};\n  \n  return result;\n};",
 				description: "JavaScript code to execute. Must export a function that takes a single item and returns processed data. You can use console.log for debugging.",
 				required: true,
 			},
@@ -142,7 +142,14 @@ export class CodeHarbor implements INodeType {
 				type: "boolean",
 				default: false,
 				description: "Whether to return detailed debug information about the execution",
-				},
+			},
+			{
+				displayName: "Capture Console Logs",
+				name: "captureLogs",
+				type: "boolean",
+				default: false,
+				description: "Whether to include console logs in the output data",
+			},
 		],
 	};
 
@@ -161,6 +168,7 @@ export class CodeHarbor implements INodeType {
 				const timeout = this.getNodeParameter('timeout', 0) as number;
 				const forceUpdate = this.getNodeParameter('forceUpdate', 0) as boolean;
 				const debug = this.getNodeParameter('debug', 0) as boolean;
+				const captureLogs = this.getNodeParameter('captureLogs', 0) as boolean;
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -195,6 +203,11 @@ export class CodeHarbor implements INodeType {
 								outputJson._debug = response.debug;
 							}
 
+							// Add console logs if capture is enabled
+							if (captureLogs && Array.isArray(response.console) && response.console.length > 0) {
+								outputJson._console = response.console;
+							}
+
 							returnData.push({
 								json: outputJson,
 								pairedItem: index < items.length ? { item: index } : undefined,
@@ -209,6 +222,11 @@ export class CodeHarbor implements INodeType {
 						// Add debug info if requested
 						if (debug && response.debug) {
 							outputJson._debug = response.debug;
+						}
+
+						// Add console logs if capture is enabled
+						if (captureLogs && Array.isArray(response.console) && response.console.length > 0) {
+							outputJson._console = response.console;
 						}
 
 						returnData.push({
@@ -242,6 +260,7 @@ export class CodeHarbor implements INodeType {
 					const timeout = this.getNodeParameter('timeout', i) as number;
 					const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
 					const debug = this.getNodeParameter('debug', i) as boolean;
+					const captureLogs = this.getNodeParameter('captureLogs', i) as boolean;
 
 					// Make API request to CodeHarbor service
 					const response = await this.helpers.httpRequest({
@@ -276,6 +295,11 @@ export class CodeHarbor implements INodeType {
 									outputJson._debug = response.debug;
 								}
 
+								// Add console logs if capture is enabled
+								if (captureLogs && Array.isArray(response.console) && response.console.length > 0) {
+									outputJson._console = response.console;
+								}
+
 								returnData.push({
 									json: outputJson,
 									pairedItem: { item: i }
@@ -290,6 +314,11 @@ export class CodeHarbor implements INodeType {
 							// Add debug info if requested
 							if (debug && response.debug) {
 								outputJson._debug = response.debug;
+							}
+
+							// Add console logs if capture is enabled
+							if (captureLogs && Array.isArray(response.console) && response.console.length > 0) {
+								outputJson._console = response.console;
 							}
 
 							returnData.push({
