@@ -42,7 +42,7 @@ export class CodeHarbor implements INodeType {
 			baseURL: "={{ $credentials.url }}",
 		},
 		properties: [
-				// Mode selection
+			// Mode selection
 			{
 				displayName: 'Mode',
 				name: 'mode',
@@ -60,7 +60,7 @@ export class CodeHarbor implements INodeType {
 				default: 'runOnceForAllItems',
 				description: 'Whether to run the code once for all items or once for each item',
 			},
-			// Code execution properties
+			// Code execution properties - FOR ALL ITEMS mode
 			{
 				displayName: "Code",
 				name: "code",
@@ -69,16 +69,50 @@ export class CodeHarbor implements INodeType {
 					editor: "jsEditor",
 					editorLanguage: "javascript",
 				},
-				default: "module.exports = function(items) {\n  // Your code here\n  // Example: Transform input items\n  console.log('Processing items:', items.length);\n\n  return items.map(item => {\n    // Process each item\n    console.log('Processing item:', item);\n    return item;\n  });\n}",
-				description: "JavaScript code to execute. Must export a function that takes input items and returns processed data. You can use console.log for debugging.",
+				displayOptions: {
+					show: {
+						mode: [
+							"runOnceForAllItems",
+						]
+					}
+				},
+				default: "// This function runs once and receives all items as an array\n// You can use external npm packages by requiring them\n// Example: const lodash = require('lodash');\n\nmodule.exports = function(items) {\n  console.log('Processing batch of', items.length, 'items');\n  \n  // Process all items in a single execution\n  const results = items.map(item => {\n    // Process each item\n    console.log('Processing:', item);\n    \n    // Return a new object with processed data\n    return {\n      ...item,\n    };\n  });\n  \n  return results;\n};",
+				description: "JavaScript code to execute. Must export a function that takes items array and returns processed data. You can use console.log for debugging.",
+				required: true,
+			},
+			// Code execution properties - FOR EACH ITEM mode
+			{
+				displayName: "Code",
+				name: "code",
+				type: "string",
+				typeOptions: {
+					editor: "jsEditor",
+					editorLanguage: "javascript",
+				},
+				displayOptions: {
+					show: {
+						mode: [
+							"runOnceForEachItem",
+						]
+					}
+				},
+				default: "// This function runs once for each item\n// You can use external npm packages by requiring them\n// Example: const lodash = require('lodash');\n\nmodule.exports = function(item) {\n  console.log('Processing item:', item);\n  \n  // Process the single item\n  const result = {\n    ...item,\n};\n  \n  return result;\n};",
+				description: "JavaScript code to execute. Must export a function that takes a single item and returns processed data. You can use console.log for debugging.",
 				required: true,
 			},
 			{
 				displayName: "Input Items",
 				name: "items",
 				type: "json",
+				displayOptions: {
+					show: {
+						mode: [
+							"runOnceForEachItem",
+						]
+					}
+				},
 				default: "={{ $json }}",
-				description: "The input data to pass to the JavaScript function",
+				description: "The input data to pass to the JavaScript function for each item",
 			},
 			{
 				displayName: "Cache Key",
@@ -225,7 +259,7 @@ export class CodeHarbor implements INodeType {
 			for (let i = 0; i < items.length; i++) {
 				try {
 					const code = this.getNodeParameter('code', i) as string;
-					const inputItems = this.getNodeParameter('items', i);
+					const inputItem = this.getNodeParameter('items', i);
 					const cacheKey = this.getNodeParameter('cacheKey', i) as string;
 					const timeout = this.getNodeParameter('timeout', i) as number;
 					const forceUpdate = this.getNodeParameter('forceUpdate', i) as boolean;
@@ -241,7 +275,7 @@ export class CodeHarbor implements INodeType {
 						},
 						body: {
 							code,
-							items: [inputItems], // Send only the current item
+							items: inputItem, // Use the inputItem from the "items" parameter
 							cacheKey,
 							options: {
 								timeout,
