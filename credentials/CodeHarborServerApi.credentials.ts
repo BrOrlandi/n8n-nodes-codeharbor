@@ -2,13 +2,14 @@ import {
 	IAuthenticateGeneric,
 	ICredentialType,
 	INodeProperties,
+	Icon,
 } from 'n8n-workflow';
 
 // Fix: Rename class to match exactly what n8n is looking for
 export class CodeHarborServerApi implements ICredentialType {
 	name = 'codeHarborServerApi'; // Keep lowercase for internal reference
 	displayName = 'CodeHarbor Server API';
-	documentationUrl = 'https://github.com/your-username/CodeHarbor-Executor';
+	icon: Icon = 'file:icon.svg'; // Added icon property
 	properties: INodeProperties[] = [
 		{
 			displayName: 'Server URL',
