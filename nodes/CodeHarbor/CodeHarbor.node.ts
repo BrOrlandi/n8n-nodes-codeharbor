@@ -251,8 +251,9 @@ export class CodeHarbor implements INodeType {
 						});
 					}
 				} else {
-					// Handle error response
-					throw new Error(response.error || 'Unknown error occurred');
+					const error = {...response}
+					error.message = response.error;
+					throw error;
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
@@ -351,8 +352,9 @@ export class CodeHarbor implements INodeType {
 							});
 						}
 					} else {
-						// Handle error response
-						throw new Error(response.error || 'Unknown error occurred');
+						const error = {...response}
+						error.message = response.error;
+						throw error;
 					}
 				} catch (error) {
 					if (this.continueOnFail()) {
