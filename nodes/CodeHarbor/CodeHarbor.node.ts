@@ -1,10 +1,36 @@
 import {
+	IBinaryData,
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
 	NodeConnectionType,
 } from "n8n-workflow";
+import { Buffer } from 'buffer';
+
+
+const getFileExtension = (mimeType: string): string => {
+	const mimeToExt: {[key: string]: string} = {
+		'image/jpeg': '.jpg',
+		'image/jpg': '.jpg',
+		'image/png': '.png',
+		'image/gif': '.gif',
+		'image/webp': '.webp',
+		'image/svg+xml': '.svg',
+		'application/pdf': '.pdf',
+		'text/plain': '.txt',
+		'text/csv': '.csv',
+		'text/html': '.html',
+		'audio/mpeg': '.mp3',
+		'audio/mp3': '.mp3',
+		'audio/wav': '.wav',
+		'video/mp4': '.mp4',
+		'application/json': '.json',
+		'application/xml': '.xml',
+		'application/zip': '.zip',
+	};
+	return mimeToExt[mimeType] || '.bin';
+}
 
 export class CodeHarbor implements INodeType {
 	description: INodeTypeDescription = {
@@ -151,6 +177,13 @@ export class CodeHarbor implements INodeType {
 						description: "The input data to pass to the JavaScript function for each item",
 					},
 					{
+						displayName: "Process Binary Output",
+						name: "processBinaryOutput",
+						type: "boolean",
+						default: true,
+						description: "Whether to process binary data in the output to be usable directly without a Convert to file node",
+					},
+					{
 						displayName: "Timeout",
 						name: "timeout",
 						type: "number",
@@ -167,6 +200,44 @@ export class CodeHarbor implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 		const credentials = await this.getCredentials('codeHarborServerApi');
 		const mode = this.getNodeParameter('mode', 0) as string;
+
+		// Utility function to calculate file size from base64 string
+		const calculateSizeFromBase64 = (base64String: string): number => {
+			// Remove padding characters and calculate size
+			const base64 = base64String.replace(/=/g, '');
+			// Base64 represents 6 bits per character, so 4 characters = 3 bytes
+			const sizeInBytes = Math.floor((base64.length * 3) / 4);
+			return sizeInBytes;
+		};
+
+		// Utility function to create a proper binary file using n8n's helpers
+		const processBinaryFile = async (value: any, itemIndex: number): Promise<{
+			[key: string]: IBinaryData
+		}> => {
+			const binaryData: { [key: string]: IBinaryData } = {};
+
+			for (const [key, val] of Object.entries<any>(value)) {
+				if (val && typeof val === 'object' && val !== null &&
+					'data' in val && typeof val.data === 'string' &&
+					'mimeType' in val && typeof val.mimeType === 'string') {
+
+					// Create a buffer from the base64 string
+					const buffer = Buffer.from(val.data, 'base64');
+
+					// Use n8n's built-in helper to create a binary file with proper view capabilities
+					const fileExtension = getFileExtension(val.mimeType);
+					const fileName = val.fileName || `file-${Date.now()}${fileExtension}`;
+
+					// Store binary data using n8n's helper (which automatically sets up correct metadata)
+					binaryData[key] = await this.helpers.prepareBinaryData(
+						buffer,
+						fileName,
+						val.mimeType
+					);
+				}
+			}
+			return binaryData;
+		};
 
 		if (mode === 'runOnceForAllItems') {
 			// Run code once for all items
@@ -199,12 +270,14 @@ export class CodeHarbor implements INodeType {
 					forceUpdate?: boolean;
 					debug?: boolean;
 					captureLogs?: boolean;
+					processBinaryOutput?: boolean;
 				};
 				const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
 				const timeout = advancedOptions.timeout || 60000;
 				const forceUpdate = advancedOptions.forceUpdate || false;
 				const debug = advancedOptions.debug || false;
 				const captureLogs = advancedOptions.captureLogs || false;
+				const processBinaryOutput = advancedOptions.processBinaryOutput !== false; // Default to true if not specified
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -229,7 +302,8 @@ export class CodeHarbor implements INodeType {
 				if (response.success) {
 					if (Array.isArray(response.data)) {
 						// Handle array of results - wrap each item in a result property
-						response.data.forEach((item, index) => {
+						// Use Promise.all instead of forEach to properly handle async operations
+						await Promise.all(response.data.map(async (item, index) => {
 							const outputJson: Record<string, any> = {
 								result: item
 							};
@@ -244,11 +318,40 @@ export class CodeHarbor implements INodeType {
 								outputJson._console = response.console;
 							}
 
-							returnData.push({
+							const outputItem: INodeExecutionData = {
 								json: outputJson,
 								pairedItem: index < items.length ? { item: index } : undefined,
-							});
-						});
+							};
+
+							// Process binary output if enabled and binary data exists in the result
+							if (processBinaryOutput &&
+								item &&
+								typeof item === 'object' &&
+								item !== null &&
+								'binary' in item &&
+								item.binary &&
+								typeof item.binary === 'object') {
+
+								try {
+									// Process binary data using n8n's built-in helpers
+									outputItem.binary = await processBinaryFile(item.binary, index);
+
+									// Remove binary data from JSON to avoid duplication
+									if (outputItem.json &&
+										outputItem.json.result &&
+										typeof outputItem.json.result === 'object' &&
+										outputItem.json.result !== null &&
+										'binary' in outputItem.json.result) {
+										delete outputItem.json.result.binary;
+									}
+								} catch (error) {
+									// If binary processing fails, log it but continue
+									console.error('Failed to process binary data:', error);
+								}
+							}
+
+							returnData.push(outputItem);
+						}));
 					} else {
 						// Handle single result - wrap in a result property
 						const outputJson: Record<string, any> = {
@@ -265,10 +368,39 @@ export class CodeHarbor implements INodeType {
 							outputJson._console = response.console;
 						}
 
-						returnData.push({
+						const outputItem: INodeExecutionData = {
 							json: outputJson,
 							pairedItem: { item: 0 }
-						});
+						};
+
+						// Process binary output if enabled and binary data exists in the result
+						if (processBinaryOutput &&
+							response.data &&
+							typeof response.data === 'object' &&
+							response.data !== null &&
+							'binary' in response.data &&
+							response.data.binary &&
+							typeof response.data.binary === 'object') {
+
+							try {
+								// Process binary data using n8n's built-in helpers
+								outputItem.binary = await processBinaryFile(response.data.binary, 0);
+
+								// Remove binary data from JSON to avoid duplication
+								if (outputItem.json &&
+									outputItem.json.result &&
+									typeof outputItem.json.result === 'object' &&
+									outputItem.json.result !== null &&
+									'binary' in outputItem.json.result) {
+									delete outputItem.json.result.binary;
+								}
+							} catch (error) {
+								// If binary processing fails, log it but continue
+								console.error('Failed to process binary data:', error);
+							}
+						}
+
+						returnData.push(outputItem);
 					}
 				} else {
 					const error = {...response}
@@ -299,6 +431,7 @@ export class CodeHarbor implements INodeType {
 						forceUpdate?: boolean;
 						debug?: boolean;
 						captureLogs?: boolean;
+						processBinaryOutput?: boolean;
 						};
 
 					// Process the input item to include binary data
@@ -326,6 +459,7 @@ export class CodeHarbor implements INodeType {
 					const forceUpdate = advancedOptions.forceUpdate || false;
 					const debug = advancedOptions.debug || false;
 					const captureLogs = advancedOptions.captureLogs || false;
+					const processBinaryOutput = advancedOptions.processBinaryOutput !== false; // Default to true if not specified
 
 					// Make API request to CodeHarbor service
 					const response = await this.helpers.httpRequest({
@@ -350,7 +484,8 @@ export class CodeHarbor implements INodeType {
 					if (response.success) {
 						if (Array.isArray(response.data)) {
 							// Handle array of results
-							response.data.forEach(item => {
+							// Use Promise.all instead of forEach to properly handle async operations
+							await Promise.all(response.data.map(async (item) => {
 								const outputJson: Record<string, any> = {
 									result: item
 								};
@@ -365,11 +500,40 @@ export class CodeHarbor implements INodeType {
 									outputJson._console = response.console;
 								}
 
-								returnData.push({
+								const outputItem: INodeExecutionData = {
 									json: outputJson,
 									pairedItem: { item: i }
-								});
-							});
+								};
+
+								// Process binary output if enabled and binary data exists in the result
+								if (processBinaryOutput &&
+									item &&
+									typeof item === 'object' &&
+									item !== null &&
+									'binary' in item &&
+									item.binary &&
+									typeof item.binary === 'object') {
+
+									try {
+										// Process binary data using n8n's built-in helpers
+										outputItem.binary = await processBinaryFile(item.binary, i);
+
+										// Remove binary data from JSON to avoid duplication
+										if (outputItem.json &&
+											outputItem.json.result &&
+											typeof outputItem.json.result === 'object' &&
+											outputItem.json.result !== null &&
+											'binary' in outputItem.json.result) {
+											delete outputItem.json.result.binary;
+										}
+									} catch (error) {
+										// If binary processing fails, log it but continue
+										console.error('Failed to process binary data:', error);
+									}
+								}
+
+								returnData.push(outputItem);
+							}));
 						} else {
 							// Handle single result
 							const outputJson: Record<string, any> = {
@@ -386,10 +550,39 @@ export class CodeHarbor implements INodeType {
 								outputJson._console = response.console;
 							}
 
-							returnData.push({
+							const outputItem: INodeExecutionData = {
 								json: outputJson,
 								pairedItem: { item: i }
-							});
+							};
+
+							// Process binary output if enabled and binary data exists in the result
+							if (processBinaryOutput &&
+								response.data &&
+								typeof response.data === 'object' &&
+								response.data !== null &&
+								'binary' in response.data &&
+								response.data.binary &&
+								typeof response.data.binary === 'object') {
+
+								try {
+									// Process binary data using n8n's built-in helpers
+									outputItem.binary = await processBinaryFile(response.data.binary, i);
+
+									// Remove binary data from JSON to avoid duplication
+									if (outputItem.json &&
+										outputItem.json.result &&
+										typeof outputItem.json.result === 'object' &&
+										outputItem.json.result !== null &&
+										'binary' in outputItem.json.result) {
+										delete outputItem.json.result.binary;
+									}
+								} catch (error) {
+									// If binary processing fails, log it but continue
+									console.error('Failed to process binary data:', error);
+								}
+							}
+
+							returnData.push(outputItem);
 						}
 					} else {
 						const error = {...response}
