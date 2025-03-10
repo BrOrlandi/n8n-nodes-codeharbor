@@ -32,7 +32,7 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/CodeHarborApi.credentials.js"
+      "dist/credentials/CodeHarborServerApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/CodeHarbor/CodeHarbor.node.js"
