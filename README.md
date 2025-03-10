@@ -7,7 +7,9 @@
 [![NPM](https://img.shields.io/npm/v/n8n-nodes-codeharbor)](https://www.npmjs.com/package/n8n-nodes-codeharbor)
 [![License](https://img.shields.io/github/license/BrOrlandi/n8n-nodes-codeharbor)](LICENSE.md)
 
-This community node allows you to execute JavaScript code with external NPM dependencies in a secure Docker container environment using the CodeHarbor execution service.
+This community node allows you to execute JavaScript code with external NPM dependencies in a secure Docker container environment using the [CodeHarbor execution service](https://github.com/BrOrlandi/CodeHarbor-Executor). 
+
+> Run code in n8n with NPM dependencies
 
 ## Features
 

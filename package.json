@@ -1,15 +1,15 @@
 {
   "name": "n8n-nodes-codeharbor",
   "version": "0.1.0",
-  "description": "",
+  "description": "Run code in n8n with NPM dependencies using CodeHarbor executor",
   "keywords": [
     "n8n-community-node-package"
   ],
   "license": "MIT",
-  "homepage": "",
+  "homepage": "https://github.com/BrOrlandi/n8n-nodes-codeharbor",
   "author": {
-    "name": "",
-    "email": ""
+    "name": "Bruno Orlandi",
+    "email": "brorlandi@gmail.com"
   },
   "repository": {
     "type": "git",
@@ -31,12 +31,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/CodeHarborApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/CodeHarbor/CodeHarbor.node.js"
     ]
   },
   "devDependencies": {
