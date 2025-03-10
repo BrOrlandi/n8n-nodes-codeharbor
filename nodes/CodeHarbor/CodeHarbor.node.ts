@@ -172,7 +172,27 @@ export class CodeHarbor implements INodeType {
 			// Run code once for all items
 			try {
 				const code = this.getNodeParameter('code', 0) as string;
-				const inputItems = items.map(item => item.json);
+
+				// Process input items to include binary data
+				const inputItems = await Promise.all(items.map(async (item, index) => {
+					const itemJson = { ...item.json };
+
+					// Add binary data if present
+					if (item.binary) {
+						itemJson.binary = {};
+						for (const binaryPropertyName of Object.keys(item.binary)) {
+							const binaryData = item.binary[binaryPropertyName];
+							const binaryBuffer = await this.helpers.getBinaryDataBuffer(index, binaryPropertyName);
+							itemJson.binary[binaryPropertyName] = {
+								...binaryData,
+								data: binaryBuffer.toString('base64'),
+							};
+						}
+					}
+
+					return itemJson;
+				}));
+
 				const advancedOptions = this.getNodeParameter('advancedOptions', 0) as {
 					cacheKey?: string;
 					timeout?: number;
@@ -279,8 +299,28 @@ export class CodeHarbor implements INodeType {
 						forceUpdate?: boolean;
 						debug?: boolean;
 						captureLogs?: boolean;
-					};
-					const inputItem = advancedOptions.items || items[i].json;
+						};
+
+					// Process the input item to include binary data
+					let inputItem = advancedOptions.items || { ...items[i].json };
+
+					// Add binary data if present
+					if (items[i].binary) {
+						if (typeof inputItem !== 'object' || inputItem === null) {
+							inputItem = {};
+						}
+
+						inputItem.binary = {};
+						for (const binaryPropertyName of Object.keys(items[i].binary)) {
+							const binaryData = items[i].binary[binaryPropertyName];
+							const binaryBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+							inputItem.binary[binaryPropertyName] = {
+								...binaryData,
+								data: binaryBuffer.toString('base64'),
+							};
+						}
+					}
+
 					const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
 					const timeout = advancedOptions.timeout || 60000;
 					const forceUpdate = advancedOptions.forceUpdate || false;
@@ -296,7 +336,7 @@ export class CodeHarbor implements INodeType {
 						},
 						body: {
 							code,
-							items: inputItem, // Use the inputItem from the "items" parameter
+							items: inputItem, // Use the inputItem with binary data
 							cacheKey,
 							options: {
 								timeout,
