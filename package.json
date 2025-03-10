@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-codeharbor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run code in n8n with NPM dependencies using CodeHarbor executor",
   "keywords": [
     "n8n-community-node-package"
