@@ -143,6 +143,79 @@ module.exports = function(item) {
 };
 ```
 
+### Working with Binary Data
+
+CodeHarbor can handle both input and output binary data, making it easy to process files, images, and other binary content without requiring additional conversion nodes.
+
+#### Accessing Binary Input Data
+
+When your workflow sends binary data to CodeHarbor, it's available in the `binary` property of each item:
+
+```javascript
+module.exports = function(item) {
+  // Check if binary data exists
+  if (item.binary) {
+    // Access binary data for each property (e.g., "data" is the default property name)
+    for (const propertyName in item.binary) {
+      const binaryData = item.binary[propertyName];
+      
+      // Binary data fields available
+      const base64Data = binaryData.data;        // Base64-encoded content
+      const mimeType = binaryData.mimeType;      // e.g., "image/png", "application/pdf"
+      const fileName = binaryData.fileName;      // Original filename
+      const fileSize = binaryData.fileSize;      // Size in bytes
+      
+      // Convert Base64 to Buffer for processing
+      const buffer = Buffer.from(base64Data, 'base64');
+      
+      console.log(`Processing ${fileName} (${mimeType}, ${fileSize} bytes)`);
+      
+      // Process the buffer...
+    }
+  }
+  
+  return item;
+};
+```
+
+#### Returning Binary Output Data
+
+To return binary data from your code, structure your response with a `binary` field that contains objects with the required properties:
+
+```javascript
+module.exports = function(item) {
+  // Example: Generate or modify binary data
+  const imageBuffer = Buffer.from([/* some binary data */]);
+  // Or using existing binary data:
+  // const imageBuffer = Buffer.from(item.binary.data.data, 'base64');
+  
+  // Return both JSON and binary data
+  return {
+    json: { 
+      message: 'Binary data processed',
+      processingInfo: 'Any additional data can go here'
+    },
+    binary: {
+      // You can use any property name (e.g., 'data', 'file', 'image')
+      data: {
+        // Required fields for n8n to recognize binary data
+        data: imageBuffer.toString('base64'),  // Base64-encoded content
+        mimeType: 'image/png',                 // MIME type of the file
+        fileName: 'processed-image.png'        // Desired filename
+      },
+      // You can include multiple binary outputs
+      secondFile: {
+        data: 'base64content...',
+        mimeType: 'application/pdf',
+        fileName: 'report.pdf'
+      }
+    }
+  };
+};
+```
+
+CodeHarbor automatically processes this structure and makes the binary data properly available to subsequent nodes in your workflow, with full preview capabilities for supported file types.
+
 ### Advanced Options
 
 - **Input Items**: Specify the data to pass to the JavaScript function (for "Run Once for Each Item" mode)
