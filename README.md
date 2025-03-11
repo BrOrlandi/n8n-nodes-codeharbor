@@ -20,6 +20,7 @@ This community node allows you to execute JavaScript code with external NPM depe
 - Debug mode with detailed execution information
 - Capture console logs in the execution output
 - Secure isolated execution environment
+- Process and return binary data (images, files, etc.)
 
 ## Requirements
 
