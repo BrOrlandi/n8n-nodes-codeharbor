@@ -139,7 +139,7 @@ export class CodeHarbor implements INodeType {
 						name: "cacheKey",
 						type: "string",
 						default: "={{ $workflow.id }}",
-						description: "Unique identifier for caching dependencies",
+						description: "Unique identifier for caching dependencies. If not provided, CodeHarbor will use a global cache internally. Only set this if you want to isolate dependencies for this specific workflow.",
 					},
 					{
 						displayName: "Capture Console Logs",
@@ -272,12 +272,27 @@ export class CodeHarbor implements INodeType {
 					captureLogs?: boolean;
 					processBinaryOutput?: boolean;
 				};
-				const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
 				const timeout = advancedOptions.timeout || 60000;
 				const forceUpdate = advancedOptions.forceUpdate || false;
 				const debug = advancedOptions.debug || false;
 				const captureLogs = advancedOptions.captureLogs || false;
 				const processBinaryOutput = advancedOptions.processBinaryOutput !== false; // Default to true if not specified
+
+				// Create request body
+				const requestBody: any = {
+					code,
+					items: inputItems,
+					options: {
+						timeout,
+						forceUpdate,
+						debug,
+					},
+				};
+				
+				// Only add cacheKey if it's provided by the user
+				if (advancedOptions.cacheKey !== undefined) {
+					requestBody.cacheKey = advancedOptions.cacheKey;
+				}
 
 				// Make API request to CodeHarbor service
 				const response = await this.helpers.httpRequest({
@@ -286,16 +301,7 @@ export class CodeHarbor implements INodeType {
 					headers: {
 						'Authorization': `Bearer ${credentials.apiKey}`,
 					},
-					body: {
-						code,
-						items: inputItems,
-						cacheKey,
-						options: {
-							timeout,
-							forceUpdate,
-							debug,
-						},
-					},
+					body: requestBody,
 				});
 
 				// Process the response
@@ -454,12 +460,27 @@ export class CodeHarbor implements INodeType {
 						}
 					}
 
-					const cacheKey = advancedOptions.cacheKey || this.getWorkflow().id?.toString() || Math.random().toString();
 					const timeout = advancedOptions.timeout || 60000;
 					const forceUpdate = advancedOptions.forceUpdate || false;
 					const debug = advancedOptions.debug || false;
 					const captureLogs = advancedOptions.captureLogs || false;
 					const processBinaryOutput = advancedOptions.processBinaryOutput !== false; // Default to true if not specified
+
+					// Create request body
+					const requestBody: any = {
+						code,
+						items: inputItem, // Use the inputItem with binary data
+						options: {
+							timeout,
+							forceUpdate,
+							debug,
+						},
+					};
+					
+					// Only add cacheKey if it's provided by the user
+					if (advancedOptions.cacheKey !== undefined) {
+						requestBody.cacheKey = advancedOptions.cacheKey;
+					}
 
 					// Make API request to CodeHarbor service
 					const response = await this.helpers.httpRequest({
@@ -468,16 +489,7 @@ export class CodeHarbor implements INodeType {
 						headers: {
 							'Authorization': `Bearer ${credentials.apiKey}`,
 						},
-						body: {
-							code,
-							items: inputItem, // Use the inputItem with binary data
-							cacheKey,
-							options: {
-								timeout,
-								forceUpdate,
-								debug,
-							},
-						},
+						body: requestBody,
 					});
 
 					// Process the response

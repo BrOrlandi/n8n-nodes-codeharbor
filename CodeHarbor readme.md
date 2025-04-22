@@ -63,7 +63,6 @@ Authorization: Bearer YOUR_SECRET_KEY
 {
 	"code": "module.exports = function(items) { return items.map(item => item * 2); }",
 	"items": [1, 2, 3, 4, 5],
-	"cacheKey": "workflow-123-node-456",
 	"options": {
 		"timeout": 30000,
 		"forceUpdate": false,
@@ -76,7 +75,7 @@ Authorization: Bearer YOUR_SECRET_KEY
 
 - `code` (required): JavaScript code that exports a function
 - `items`: Input data to pass to the function (default: [])
-- `cacheKey` (required): Unique identifier for dependency caching
+- `cacheKey` (optional): Unique identifier for dependency caching. If not provided, CodeHarbor will use a global cache internally.
 - `options`:
   - `timeout`: Custom execution timeout in milliseconds
   - `forceUpdate`: Force fresh installation of dependencies
@@ -139,14 +138,13 @@ curl -X POST http://localhost:3000/execute \
   -d '{
     "code": "module.exports = function(items) { return items.map(item => item * 2); }",
     "items": [1, 2, 3, 4, 5],
-    "cacheKey": "workflow-123-node-456",
     "options": {
       "debug": true
     }
   }'
 ```
 
-### Example with Dependencies
+### Example with Dependencies and Custom Cache Key
 
 ```bash
 curl -X POST http://localhost:3000/execute \
@@ -156,6 +154,18 @@ curl -X POST http://localhost:3000/execute \
     "code": "const _ = require('\''lodash'\''); module.exports = function(items) { return _.map(items, item => item * 2); }",
     "items": [1, 2, 3, 4, 5],
     "cacheKey": "workflow-123-node-456"
+  }'
+```
+
+### Example with Global Cache (No Cache Key)
+
+```bash
+curl -X POST http://localhost:3000/execute \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-secret-key-here" \
+  -d '{
+    "code": "const _ = require('\''lodash'\''); module.exports = function(items) { return _.map(items, item => item * 2); }",
+    "items": [1, 2, 3, 4, 5]
   }'
 ```
 
